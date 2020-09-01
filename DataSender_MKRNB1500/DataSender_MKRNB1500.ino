@@ -45,20 +45,12 @@ void loop()
     add_timestamp();
     int encoded_length = base64_encoded_length(DATA_SIZE);
     char encoded_data[encoded_length];
-    //Serial.print(F("Encoding data of size "));
-    //Serial.println(encoded_length);
     base64_encode(encoded_data, (char*)data_array, DATA_SIZE);
     data_index = 8; //Once the data is encoded the original data buffer is free to use.
-    //Serial.println(F("Data encoded! Sending to server..."));
-    check_connection();
-    //unsigned long time_before_publish = millis();
-    //Serial.println(F("Setting up post request"));
-    publish_post(encoded_data, encoded_length);
-    //unsigned long time_after_publish = millis() - time_before_publish;
-    //Serial.print(F("Published in "));
-    //Serial.print(time_after_publish);
-    //Serial.println(F(" ms\n"));
-    //Serial.println(F("Data sent."));
+    if(check_connection())
+    {
+        publish_post(encoded_data, encoded_length);
+    }    
   }
 }
 
@@ -93,7 +85,7 @@ bool check_connection()
     //Serial.println(F("Not attached with GPRS"));
     attach_gprs();
   }
-  establish_server_connection();
+  return establish_server_connection() && nbAccess.status() == NB_READY && gprs.status() == GPRS_READY;
 }
 
 bool establish_server_connection()
@@ -110,15 +102,6 @@ bool establish_server_connection()
   bool is_connected = client.connected();
   if (!is_connected)
   {
-    //Serial.println(F("Connecting to server"));
-    //if (client.connect(server, port))
-    //{
-      //Serial.println(F("Connected to server"));
-    //}
-    //else
-    //{
-      //Serial.println(F("Unable to connect to server"));
-    //}
     is_connected = client.connect(server, port);
   }
   return is_connected;
@@ -126,18 +109,14 @@ bool establish_server_connection()
 
 void attach_gprs()
 {
-  //Serial.println(F("Attaching GPRS"));
   while (gprs.attachGPRS() != GPRS_READY)
   {
-    //Serial.println(F("Failed to attach GPRS"));
     delay(1000);
   }
-  //Serial.println(F("Attached GPRS"));
 }
 
 void connect_nb()
 {
-  //Serial.println(F("Connecting NB Modem"));
   while (nbAccess.begin() != NB_READY)
   {
     //Serial.println(F("Failed to connect to NB modem"));

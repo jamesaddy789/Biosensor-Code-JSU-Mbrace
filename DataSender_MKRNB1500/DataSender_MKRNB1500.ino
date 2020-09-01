@@ -120,7 +120,6 @@ void connect_nb()
   while (nbAccess.begin() != NB_READY)
   {
     //Serial.println(F("Failed to connect to NB modem"));
-    nbAccess.shutdown();
     delay(1000);
   }
   //Serial.println(F("Connected to NB modem"));

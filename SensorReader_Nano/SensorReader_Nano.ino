@@ -13,8 +13,9 @@ unsigned int reading_index = 0;
 byte readings[DATA_SIZE];
 
 void setup() {
+  Serial.begin(9600);
   Wire.begin();
-  delay(30000);
+  //delay(30000);
   start_time = millis();
 }
 
@@ -33,7 +34,9 @@ void loop() {
       reading_index = 0;
       Wire.beginTransmission(I2C_ID);     
       Wire.write(readings, DATA_SIZE);
+      Serial.println("Calling Wire.endTransmission())");
       Wire.endTransmission();  
+      Serial.println("Completed transmission!");
     }
   }
 }

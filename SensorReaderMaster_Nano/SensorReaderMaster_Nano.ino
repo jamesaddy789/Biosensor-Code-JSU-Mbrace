@@ -9,8 +9,6 @@
 
 #define DATA_SIZE 30 //Wire buffer size is only 32
 #define SAMPLE_INTERVAL 100
-#define DEFAULT_ANALOG_MAX 1023
-#define TARGET_ANALOG_MAX 100 
 #define I2C_ID 0
 
 unsigned long start_time = 0;
@@ -45,6 +43,6 @@ void loop() {
 
 byte scale_analog_value(int value)
 {
-  float ratio = (float)value/(float)DEFAULT_ANALOG_MAX;
-  return ratio * TARGET_ANALOG_MAX;
+  //floor(1023 / 4) = 255
+  return value / 4.0;
 }

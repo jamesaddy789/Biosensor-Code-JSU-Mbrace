@@ -8,8 +8,6 @@
 #include <Wire.h>
 
 #define SENSOR_NUMBER 6
-#define DEFAULT_ANALOG_MAX 1023
-#define TARGET_ANALOG_MAX 100 
 #define I2C_ID 0
 
 byte readings[SENSOR_NUMBER];
@@ -34,6 +32,6 @@ void read_and_send_on_request() {
 
 byte scale_analog_value(int value)
 {
-  float ratio = (float)value/(float)DEFAULT_ANALOG_MAX;
-  return ratio * TARGET_ANALOG_MAX;
+  //floor(1023 / 4) = 255
+  return value / 4.0;
 }

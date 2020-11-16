@@ -1,11 +1,16 @@
 /* Written by James Curtis Addy 
+ *  
+ *  This code makes the Nano behave as an i2c master that
+ *  collects readings every sample interval and then sends
+ *  them to the target device when the buffer is full.
 */
+
 #include <Wire.h>
 
-#define DATA_SIZE 30 //Wire buffer size is 32
+#define DATA_SIZE 30 //Wire buffer size is only 32
 #define SAMPLE_INTERVAL 100
 #define DEFAULT_ANALOG_MAX 1023
-#define TARGET_MAX 100 
+#define TARGET_ANALOG_MAX 100 
 #define I2C_ID 0
 
 unsigned long start_time = 0;
@@ -13,9 +18,8 @@ unsigned int reading_index = 0;
 byte readings[DATA_SIZE];
 
 void setup() {
-  Serial.begin(9600);
   Wire.begin();
-  //delay(30000);
+  delay(100);
   start_time = millis();
 }
 
@@ -34,9 +38,7 @@ void loop() {
       reading_index = 0;
       Wire.beginTransmission(I2C_ID);     
       Wire.write(readings, DATA_SIZE);
-      Serial.println("Calling Wire.endTransmission())");
       Wire.endTransmission();  
-      Serial.println("Completed transmission!");
     }
   }
 }
@@ -44,5 +46,5 @@ void loop() {
 byte scale_analog_value(int value)
 {
   float ratio = (float)value/(float)DEFAULT_ANALOG_MAX;
-  return ratio * TARGET_MAX;
+  return ratio * TARGET_ANALOG_MAX;
 }

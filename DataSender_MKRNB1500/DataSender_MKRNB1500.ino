@@ -149,11 +149,11 @@ bool get_server_response()
     char* good_response = strstr(response, "200 OK");
     if (good_response) return true;
   }
-  else
-  {
+//  else
+//  {
 //    Serial.print(response_timeout);
 //    Serial.println(F(" ms passed without a response"));
-  }
+//  }
   return false;
 }
 

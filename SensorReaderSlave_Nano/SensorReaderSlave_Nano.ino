@@ -32,6 +32,6 @@ void read_and_send_on_request() {
 
 byte scale_analog_value(int value)
 {
-  //floor(1023 / 4) = 255
-  return value / 4.0;
+  //floor(1023 / 4) = 255 or 1023 >> 2 = 255
+  return value >> 2;
 }

@@ -23,10 +23,10 @@ const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 #define NUMBER_OF_SENSORS 6
 
 //Change this stuff////
-const char* ssid = "your-network";//network name
+const char* ssid = "WIFINET";//network name
 const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
-const char* wifi_password =  "your-password";
-String server_file_name = "esp32_test";
+const char* wifi_password =  "monty456";
+String server_file_name = "esp32_test_with_timeout";
 const char* experiment_start_date = "MM-DD-YYYY"; //This date will be used for the SD file name
 ///////////////////////
 
@@ -51,11 +51,13 @@ void setup()
   Serial.begin(9600);
   Wire.begin(I2C_ID);
   unsigned long start_millis = millis();
-  while (WiFi.status() != WL_CONNECTED && !get_is_timed_out(start_millis, 10000))
+  while (WiFi.status() != WL_CONNECTED && !get_is_timed_out(start_millis, 30000))
   {
     establish_wifi_connection();
     delay(1000);
   }
+  Serial.println("WiFi connected!");
+  client.setTimeout(1);
   establish_server_connection();
   data_array[0] = '{';
   data_array[1] = '{';
@@ -86,6 +88,7 @@ void loop()
     data_index = 8; //Once the data is encoded the original data buffer is free to use.
     if (check_connection())
     {
+      Serial.println("Ready to publish data");
       publish_post(encoded_data, encoded_length);
     }
   }
@@ -108,14 +111,14 @@ bool request_readings()
 {
     if(data_index >= DATA_SIZE) return false; //Don't read if the buffer is full
     Wire.requestFrom(I2C_ID, NUMBER_OF_SENSORS);   
-    while (Wire.available()) {
+    while (Wire.available())
+    {
       for (int i = 0; i < NUMBER_OF_SENSORS; i++)
       {
         data_array[data_index] = Wire.read();
         data_index++;
       }
-    }      
-    return true;
+    }  
 }
 
 bool get_is_timed_out(unsigned long start_millis, unsigned int timeout)
@@ -131,9 +134,13 @@ bool check_connection()
   }
   if (WiFi.status() == WL_CONNECTED)
   {
-    if (establish_server_connection());
-    return true;
-  }
+    Serial.println("WiFi status is connected");
+    if (establish_server_connection())
+    {      
+      Serial.println("Connected to server");
+      return true;
+    }
+  }     
   return false;
 }
 
@@ -144,18 +151,15 @@ void add_timestamp()
   data_array[2] = (current_millis >> 16) & 255;
   data_array[3] = (current_millis >> 8) & 255;
   data_array[4] = current_millis & 255;
-  Serial.print(F("Current millis: "));
-  Serial.println(current_millis);
 }
 
 void establish_wifi_connection()
 {
-  Serial.println(F("Currently, there is no WiFi connection."));
   Serial.print(F("Connecting to network: "));
   Serial.println(ssid);
-  //WiFi.disconnect(true);  //disconnect form wifi to set new wifi connection
   if (wifi_username != "")
   {
+    Serial.println("Enterprise connection");
     //Enterprise setup
     WiFi.mode(WIFI_STA); //init wifi mode
     esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)wifi_username, strlen(wifi_username)); //provide identity
@@ -169,14 +173,15 @@ void establish_wifi_connection()
 
 bool establish_server_connection()
 {
-  client.flush(); //Clears the write buffer
+  client.flush(); //Clears the client buffer
+  while (client.available())
+  {
+    //Serial.print((char)client.read());
+    client.read();
+  }
   /*Clear read buffer because connected() returns true
     even with no server connection if there is still data
     in the read buffer*/
-  while (client.available())
-  {
-    Serial.print((char)client.read());
-  }
   if (!client.connected())
   {
     Serial.println(F("Connecting to server"));
@@ -188,9 +193,10 @@ bool establish_server_connection()
     else
     {
       Serial.println(F("Unable to connect to server"));
+      return false;
     }
   }
-  return false;
+  return true;
 }
 
 void publish_post(char* encoded_data, int encoded_length)

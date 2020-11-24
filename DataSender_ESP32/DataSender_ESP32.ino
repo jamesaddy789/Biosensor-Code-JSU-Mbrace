@@ -23,9 +23,9 @@ const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 #define NUMBER_OF_SENSORS 6
 
 //Change this stuff////
-const char* ssid = "WIFINET";//network name
+const char* ssid = "network";//network name
 const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
-const char* wifi_password =  "monty456";
+const char* wifi_password =  "password";
 String server_file_name = "esp32_test_with_timeout";
 const char* experiment_start_date = "MM-DD-YYYY"; //This date will be used for the SD file name
 ///////////////////////

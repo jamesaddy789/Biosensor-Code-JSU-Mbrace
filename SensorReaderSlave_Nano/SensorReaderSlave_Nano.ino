@@ -8,13 +8,16 @@
 #include <Wire.h>
 
 #define SENSOR_NUMBER 6
-#define I2C_ID 0
+#define I2C_ID 1
 
 byte readings[SENSOR_NUMBER];
 
 void setup() {
   Wire.begin(I2C_ID);
   Wire.onRequest(read_and_send_on_request);
+  DDRD = DDRD | 0xFC;    //Declare D2 to D7 as OUTPUTS
+  PORTD = PORTD | 0xFC;  //Set D2 to D7 HIGH
+  pinMode(10, OUTPUT);
 }
 
 void loop() {  
@@ -32,6 +35,6 @@ void read_and_send_on_request() {
 
 byte scale_analog_value(int value)
 {
-  //floor(1023 / 4) = 255 or 1023 >> 2 = 255
+  //1023 >> 2 = 255
   return value >> 2;
 }

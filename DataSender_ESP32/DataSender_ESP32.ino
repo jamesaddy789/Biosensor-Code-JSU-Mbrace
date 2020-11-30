@@ -1,6 +1,6 @@
 /* Written by James Curtis Addy
  * 
- * This code makes an Esp32 or Esp8266 act as an i2c slave that will
+ * This code makes an Esp32 or Esp8266 act as an i2c slave that will  (Should be a Master..........)
  * request readings 10 times per second from the master device. The 
  * readings will be saved to an SD card and sent over the internet 
  * using WiFi when the data buffer is full. WPA2 Enterprise connection
@@ -19,28 +19,29 @@
 
 #define DATA_SIZE 68 //60 bytes for readings and 8 for timestamp {TTTT}
 const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
-#define I2C_ID 0
+#define I2C_ID 1
 #define NUMBER_OF_SENSORS 6
 
 //Change this stuff////
-const char* ssid = "network";//network name
+const char* ssid = "jsumobilenet";//network name 
 const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
-const char* wifi_password =  "password";
-String server_file_name = "esp32_test_with_timeout";
-const char* experiment_start_date = "MM-DD-YYYY"; //This date will be used for the SD file name
+const char* wifi_password =  ""; //password
+String server_file_name; //This will be the mac address acquired from WiFi.macAddress()
+const char* experiment_start_date = "2020-11-30"; //This date will be used for the SD file name
 ///////////////////////
 
 WiFiClient client;
 volatile byte data_array[DATA_SIZE];
 volatile size_t data_index = 8; //Start after the timestamp
 char server[] = "mbrace.xyz";
-const char* server_directory = "Lab%20Data";
+const char* server_directory = "GCRL_1130"; 
 int port = 80;
 
 //SD
-String sd_folder_name_string;
+const char* sd_folder_name = "/GCRL_1130";
 unsigned int sd_file_counter = 0;
 String sd_file_path_string;
+String sd_file_suffix;
 File sd_file;
 
 hw_timer_t* timer = NULL;
@@ -49,13 +50,14 @@ volatile bool timer_interrupt_flagged = false;
 void setup()
 {
   Serial.begin(9600);
-  Wire.begin(I2C_ID);
+  Wire.begin();
   unsigned long start_millis = millis();
   while (WiFi.status() != WL_CONNECTED && !get_is_timed_out(start_millis, 30000))
   {
     establish_wifi_connection();
     delay(1000);
   }
+  
   Serial.println("WiFi connected!");
   client.setTimeout(1);
   establish_server_connection();
@@ -64,6 +66,9 @@ void setup()
   data_array[6] = '}';
   data_array[7] = '}';
 
+  server_file_name = String(WiFi.macAddress());
+  server_file_name.replace(":", "_");
+  
   //Begin SD object (mount to SD card)
   while (!SD.begin(5)) {}
   Serial.println(F("SD Card Mount Succeeded"));
@@ -95,10 +100,8 @@ void loop()
 
   if(timer_interrupt_flagged)
   {
-    if(request_readings())
-    {
-      timer_interrupt_flagged = false;
-    }   
+    request_readings();
+    timer_interrupt_flagged = false; 
   }
 }
 
@@ -108,11 +111,12 @@ void flag_timer_interrupt()
 }
 
 bool request_readings()
-{
+{   
     if(data_index >= DATA_SIZE) return false; //Don't read if the buffer is full
-    Wire.requestFrom(I2C_ID, NUMBER_OF_SENSORS);   
+    Wire.requestFrom(I2C_ID, NUMBER_OF_SENSORS);  
+   
     while (Wire.available())
-    {
+    { 
       for (int i = 0; i < NUMBER_OF_SENSORS; i++)
       {
         data_array[data_index] = Wire.read();
@@ -147,17 +151,18 @@ bool check_connection()
 void add_timestamp()
 {
   unsigned long current_millis = millis();
-  data_array[1] = (current_millis >> 24) & 255;
-  data_array[2] = (current_millis >> 16) & 255;
-  data_array[3] = (current_millis >> 8) & 255;
-  data_array[4] = current_millis & 255;
+  data_array[2] = (current_millis >> 24) & 255;
+  data_array[3] = (current_millis >> 16) & 255;
+  data_array[4] = (current_millis >> 8) & 255;
+  data_array[5] = current_millis & 255;
 }
 
 void establish_wifi_connection()
 {
   Serial.print(F("Connecting to network: "));
   Serial.println(ssid);
-  if (wifi_username != "")
+  
+  if (String(wifi_username) != "")
   {
     Serial.println("Enterprise connection");
     //Enterprise setup
@@ -173,12 +178,12 @@ void establish_wifi_connection()
 
 bool establish_server_connection()
 {
-  client.flush(); //Clears the client buffer
   while (client.available())
   {
     //Serial.print((char)client.read());
     client.read();
   }
+  client.flush(); //Clears the client buffer
   /*Clear read buffer because connected() returns true
     even with no server connection if there is still data
     in the read buffer*/
@@ -261,41 +266,49 @@ void update_sd_file(fs::FS &fs)
     sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
   }
 
-  //Create a new file when current file is at the limit
-  if (sd_file.size() >= BYTES_PER_DAY)
-  {
-    sd_file_counter += 1;
-    sd_file.close();
-    update_sd_file_path_string();
-    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
-  }
   sd_file.write((uint8_t*)data_array, DATA_SIZE);
   sd_file.flush();
   Serial.print(sd_file.name());
   Serial.print(F("'s file size: "));
   Serial.println(sd_file.size());
+  Serial.print(F("The file pointer position is: "));
+  Serial.println(sd_file.position());
+  
+  //Create a new file when current file is at the limit
+  if (sd_file.size() >= BYTES_PER_DAY)
+  {
+    sd_file_counter += 1;
+    sd_file.close();
+    sd_file_suffix = String(sd_file_counter);
+    update_sd_file_path_string();
+    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
+  }
 }
 
 void initialize_sd_file()
 {
-  set_sd_folder_name_string();
   //Create SD folder if it doesn't exist on the card
-  if (!SD.exists(sd_folder_name_string.c_str()))
+  if (!SD.exists(sd_folder_name))
   {
-    SD.mkdir(sd_folder_name_string.c_str());
+    SD.mkdir(sd_folder_name);
   }
-  //Set counter to the most recent file in the folder
-  sd_file_counter = get_file_count(SD, sd_folder_name_string.c_str());
-  if (sd_file_counter == 0) sd_file_counter = 1; //Start at 1
-}
-
-void set_sd_folder_name_string()
-{
-  sd_folder_name_string = String("/" + WiFi.macAddress() + "_" + String(experiment_start_date));
-  sd_folder_name_string.replace(":", "_");
+  //Set counter to the most recent file in the folder.
+  sd_file_counter = get_file_count(SD, sd_folder_name) + 1;
+  if (sd_file_counter != 1)
+  {
+    //If there are already files in the folder, this must be a reset.
+    sd_file_suffix = String(String(sd_file_counter) + "_Reset");
+  }
+  else
+  {
+    //Otherwise, start the count at 1.
+    sd_file_suffix = String(sd_file_counter);
+  }
 }
 
 void update_sd_file_path_string()
 {
-  sd_file_path_string = String(sd_folder_name_string + "/data-" + String(sd_file_counter) + ".bin");
+  //The mac address is already acquired in the server file name.
+  sd_file_path_string = String(String(sd_folder_name) + "/" + server_file_name + "__" + String(experiment_start_date) + "_"  + sd_file_suffix + ".bin");
+  Serial.println(sd_file_path_string);
 }

@@ -1,7 +1,7 @@
 /* Written by James Curtis Addy
  * 
- * This code makes an Esp32 or Esp8266 act as an i2c slave that will  (Should be a Master..........)
- * request readings 10 times per second from the master device. The 
+ * This code makes an Esp32 or Esp8266 act as an i2c master that will
+ * request readings 10 times per second from the slave device. The 
  * readings will be saved to an SD card and sent over the internet 
  * using WiFi when the data buffer is full. WPA2 Enterprise connection
  * is supported.

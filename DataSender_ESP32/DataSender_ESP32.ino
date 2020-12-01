@@ -87,6 +87,7 @@ void loop()
   {
     add_timestamp();
     update_sd_file(SD);
+    yield();
     int encoded_length = base64_encoded_length(DATA_SIZE);
     char encoded_data[encoded_length];
     base64_encode(encoded_data, (char*)data_array, DATA_SIZE);
@@ -94,6 +95,7 @@ void loop()
     if (check_connection())
     {
       Serial.println("Ready to publish data");
+      yield();
       publish_post(encoded_data, encoded_length);
     }
   }
@@ -178,12 +180,16 @@ void establish_wifi_connection()
 
 bool establish_server_connection()
 {
+  yield();
   while (client.available())
   {
     //Serial.print((char)client.read());
     client.read();
+    //Maybe a yield here
+    //yield()
   }
   client.flush(); //Clears the client buffer
+  yield();
   /*Clear read buffer because connected() returns true
     even with no server connection if there is still data
     in the read buffer*/
@@ -204,26 +210,57 @@ bool establish_server_connection()
   return true;
 }
 
-void publish_post(char* encoded_data, int encoded_length)
+//void publish_post(char* encoded_data, int encoded_length)
+//{
+//  client.print(F("POST /"));
+//  client.print(server_directory);
+//  client.println(F("/index.php HTTP/1.1"));
+//  client.println(F("HOST: mbrace.xyz"));
+//  client.println(F("Content-Type: application/json"));
+//  //JSON structure:
+//  //{"n":"NAME", "d":"DATA"}
+//  // [(4 quotations/parameter + 1 colon/parameter) x #parameters] + 2 brackets + [(#parameters - 1) x ( 1 comma + 1 space)] = (5x2) + 2 + 2 = 14 characters
+//  // 14 characters + 2 for 'n' and 'd' = 16 total characters
+//  int content_length = 16 + server_file_name.length() + encoded_length;
+//  client.print(F("Content-Length: "));
+//  client.println(content_length);
+//  client.println();
+//  client.print(F("{\"n\":\""));
+//  client.print(server_file_name);
+//  client.print(F("\", \"d\":\""));
+//  client.print(encoded_data);
+//  client.println(F("\"}"));
+//}
+
+bool valid_send(size_t size_from_send)
 {
-  client.print(F("POST /"));
-  client.print(server_directory);
-  client.println(F("/index.php HTTP/1.1"));
-  client.println(F("HOST: mbrace.xyz"));
-  client.println(F("Content-Type: application/json"));
+//  Serial.print("Send size: ");
+//  Serial.println(size_from_send);
+  return size_from_send > 0;
+}
+
+bool publish_post(char* encoded_data, int encoded_length)
+{
   //JSON structure:
   //{"n":"NAME", "d":"DATA"}
   // [(4 quotations/parameter + 1 colon/parameter) x #parameters] + 2 brackets + [(#parameters - 1) x ( 1 comma + 1 space)] = (5x2) + 2 + 2 = 14 characters
   // 14 characters + 2 for 'n' and 'd' = 16 total characters
   int content_length = 16 + server_file_name.length() + encoded_length;
-  client.print(F("Content-Length: "));
-  client.println(content_length);
-  client.println();
-  client.print(F("{\"n\":\""));
-  client.print(server_file_name);
-  client.print(F("\", \"d\":\""));
-  client.print(encoded_data);
-  client.println(F("\"}"));
+  bool good_publish = valid_send(client.print(F("POST /"))) &&
+                      valid_send(client.print(server_directory)) &&
+                      valid_send(client.println(F("/index.php HTTP/1.1"))) &&
+                      valid_send(client.println(F("HOST: mbrace.xyz"))) &&
+                      valid_send(client.println(F("Content-Type: application/json"))) &&
+                      valid_send(client.println(F("Connection: close"))) &&
+                      valid_send(client.print(F("Content-Length: "))) &&
+                      valid_send(client.println(content_length)) &&
+                      valid_send(client.println()) &&
+                      valid_send(client.print(F("{\"n\":\""))) &&
+                      valid_send(client.print(server_file_name)) &&
+                      valid_send(client.print(F("\", \"d\":\""))) &&
+                      valid_send(client.print(encoded_data)) &&
+                      valid_send(client.println(F("\"}")));
+  return good_publish;
 }
 
 //SD functions

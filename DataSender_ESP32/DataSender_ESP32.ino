@@ -14,7 +14,7 @@
 #include "Base64Encode.h"
 #include "FS.h"
 #include "SD.h"
-#include "SPI.h"
+//#include "SPI.h"
 #include <string.h>
 
 #define DATA_SIZE 68 //60 bytes for readings and 8 for timestamp {TTTT}
@@ -71,9 +71,9 @@ void setup()
   server_file_name.replace(":", "_");
   
   //Begin SD object (mount to SD card)
-  while (!SD.begin(5)) {}
-  Serial.println(F("SD Card Mount Succeeded"));
-  initialize_sd_file();
+//  while (!SD.begin(5)) {}
+//  Serial.println(F("SD Card Mount Succeeded"));
+//  initialize_sd_file();
 
   //Set timer to 10HZ
   timer = timerBegin(0, 8000, true); //80MZ / 8000 = 10000HZ
@@ -87,8 +87,8 @@ void loop()
   if (data_index >= DATA_SIZE)
   {
     add_timestamp();
-    update_sd_file(SD);
-    yield();
+    //update_sd_file(SD);
+    //yield();
     int encoded_length = base64_encoded_length(DATA_SIZE);
     char encoded_data[encoded_length];
     base64_encode(encoded_data, (char*)data_array, DATA_SIZE);

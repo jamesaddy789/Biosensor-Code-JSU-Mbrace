@@ -43,6 +43,7 @@ unsigned int sd_file_counter = 0;
 String sd_file_path_string;
 String sd_file_suffix;
 File sd_file;
+unsigned long bytes_written = 0;
 
 hw_timer_t* timer = NULL;
 volatile bool timer_interrupt_flagged = false;
@@ -289,7 +290,7 @@ unsigned int get_file_count(fs::FS &fs, const char* folder_path)
       count++;
     }
     current_file.close();
-    current_file = root.openNextFile();
+    current_file = root.openNextFile();    
   }
   return count;
 }
@@ -305,15 +306,18 @@ void update_sd_file(fs::FS &fs)
 
   sd_file.write((uint8_t*)data_array, DATA_SIZE);
   sd_file.flush();
-  Serial.print(sd_file.name());
-  Serial.print(F("'s file size: "));
-  Serial.println(sd_file.size());
-  Serial.print(F("The file pointer position is: "));
-  Serial.println(sd_file.position());
+  bytes_written += DATA_SIZE;
+
+//  Serial.print(sd_file.name());
+//  Serial.print(F("'s file size: "));
+//  Serial.println(sd_file.size());
+//  Serial.print(F("The file pointer position is: "));
+//  Serial.println(sd_file.position());
   
-  //Create a new file when current file is at the limit
-  if (sd_file.size() >= BYTES_PER_DAY)
+  //Create a new file when bytes written is a day's amount.
+  if (bytes_written >= BYTES_PER_DAY)
   {
+    bytes_written = 0;
     sd_file_counter += 1;
     sd_file.close();
     sd_file_suffix = String(sd_file_counter);
@@ -341,6 +345,7 @@ void initialize_sd_file()
     //Otherwise, start the count at 1.
     sd_file_suffix = String(sd_file_counter);
   }
+  bytes_written = 0;
 }
 
 void update_sd_file_path_string()

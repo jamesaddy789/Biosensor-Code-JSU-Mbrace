@@ -1,17 +1,15 @@
 /* Written by James Curtis Addy
  * 
- * This code makes an Esp32 act as an i2c master that will
+ * This code makes an Esp8266 act as an i2c master that will
  * request readings 10 times per second from the slave device. The 
  * readings will be saved to an SD card and sent over the internet 
- * using WiFi when the data buffer is full. WPA2 Enterprise connection
- * is supported.
+ * using WiFi when the data buffer is full.
  */
 
 #include <Wire.h>
-#include "esp_wpa2.h" //wpa2 library for connections to Enterprise networks
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include "Base64Encode.h"
-#include "SD.h"
+#include <SD.h>
 
 #define DATA_SIZE 68 //60 bytes for readings and 8 for timestamp {{TTTT}}
 const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
@@ -125,7 +123,9 @@ bool check_connection()
 {
   if (WiFi.status() != WL_CONNECTED)
   {
-    establish_wifi_connection();
+    Serial.print(F("Connecting to network: "));
+    Serial.println(ssid);
+    WiFi.begin(ssid, wifi_password);
   }
   if (WiFi.status() == WL_CONNECTED)
   {
@@ -144,25 +144,6 @@ void add_timestamp()
   data_array[3] = (current_millis >> 16) & 255;
   data_array[4] = (current_millis >> 8) & 255;
   data_array[5] = current_millis & 255;
-}
-
-void establish_wifi_connection()
-{
-  Serial.print(F("Connecting to network: "));
-  Serial.println(ssid);
-  
-  if (String(wifi_username) != "")
-  {
-    Serial.println("Enterprise connection");
-    //Enterprise setup
-    WiFi.mode(WIFI_STA); //init wifi mode
-    esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)wifi_username, strlen(wifi_username)); //provide identity
-    esp_wifi_sta_wpa2_ent_set_username((uint8_t *)wifi_username, strlen(wifi_username)); //provide username --> identity and username is same
-    esp_wifi_sta_wpa2_ent_set_password((uint8_t *)wifi_password, strlen(wifi_password)); //provide password
-    esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT(); //set config settings to default
-    esp_wifi_sta_wpa2_ent_enable(&config); //set config settings to enable function
-  }
-  WiFi.begin(ssid, wifi_password);
 }
 
 bool establish_server_connection()
@@ -257,7 +238,7 @@ void update_sd_file()
   {
     //Initialize file
     update_sd_file_path_string();
-    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
+    sd_file = SD.open(sd_file_path_string.c_str(), FILE_WRITE);
   }
 
   sd_file.write((uint8_t*)data_array, DATA_SIZE);
@@ -272,7 +253,7 @@ void update_sd_file()
     sd_file.close();
     sd_file_suffix = String(sd_file_counter);
     update_sd_file_path_string();
-    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
+    sd_file = SD.open(sd_file_path_string.c_str(), FILE_WRITE);
   }
 }
 

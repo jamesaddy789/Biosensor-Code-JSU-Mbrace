@@ -18,21 +18,21 @@ const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 
 //Change this stuff////
 const char* ssid = "jsumobilenet";//network name 
-const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
 const char* wifi_password =  ""; //password
-String file_name; //This will be the mac address acquired from WiFi.macAddress()
 const char* experiment_start_date = "2020-11-30"; //This date will be used for the SD file name
+const char* server_directory = "GCRL_1130"; 
+const char* sd_folder_name = "/GCRL_1130"; //Must start with "/" 
 ///////////////////////
 
 WiFiClient client;
 volatile byte data_array[DATA_SIZE];
 volatile size_t data_index = 8; //Start after the timestamp
 char server[] = "mbrace.xyz";
-const char* server_directory = "GCRL_1130"; 
+String file_name; //This will be the mac address acquired from WiFi.macAddress()
+
 int port = 80;
 
 //SD
-const char* sd_folder_name = "/GCRL_1130";
 unsigned int sd_file_counter = 0;
 String sd_file_path_string;
 String sd_file_suffix;

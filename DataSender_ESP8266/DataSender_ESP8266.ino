@@ -11,7 +11,7 @@
 #include "Base64Encode.h"
 #include <SD.h>
 
-#define DATA_SIZE 68 //60 bytes for readings and 8 for timestamp {{TTTT}}
+#define DATA_SIZE 128 //120 bytes for readings and 8 for timestamp {{TTTT}}
 const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 #define I2C_ID 1
 #define NUMBER_OF_SENSORS 6
@@ -75,7 +75,6 @@ void loop()
   {
     add_timestamp();
     update_sd_file();
-
     int encoded_length = base64_encoded_length(DATA_SIZE);
     char encoded_data[encoded_length];
     base64_encode(encoded_data, (char*)data_array, DATA_SIZE);
@@ -189,7 +188,7 @@ bool publish_post(char* encoded_data, int encoded_length)
                       valid_send(client.println(F("/index.php HTTP/1.1"))) &&
                       valid_send(client.println(F("HOST: mbrace.xyz"))) &&
                       valid_send(client.println(F("Content-Type: application/json"))) &&
-                      valid_send(client.println(F("Connection: close"))) &&
+                      valid_send(client.println(F("Connection: keep-alive"))) &&
                       valid_send(client.print(F("Content-Length: "))) &&
                       valid_send(client.println(content_length)) &&
                       valid_send(client.println()) &&

@@ -25,12 +25,24 @@ void loop() {
   if((millis() - start_time) >= SAMPLE_INTERVAL)
   {
     start_time = millis();      
-    readings[reading_index++] = scale_analog_value(analogRead(A0));
-    readings[reading_index++] = scale_analog_value(analogRead(A1));
-    readings[reading_index++] = scale_analog_value(analogRead(A2));
-    readings[reading_index++] = scale_analog_value(analogRead(A3));
-    readings[reading_index++] = scale_analog_value(analogRead(A6));
-    readings[reading_index++] = scale_analog_value(analogRead(A7));  
+    readings[reading_index++] = get_MSB(analogRead(A0));
+    readings[reading_index++] = get_LSB(analogRead(A0));
+    
+    readings[reading_index++] = get_MSB(analogRead(A1));
+    readings[reading_index++] = get_LSB(analogRead(A1));
+    
+    readings[reading_index++] = get_MSB(analogRead(A2));
+    readings[reading_index++] = get_LSB(analogRead(A2));
+    
+    readings[reading_index++] = get_MSB(analogRead(A3));
+    readings[reading_index++] = get_LSB(analogRead(A3));
+    
+    readings[reading_index++] = get_MSB(analogRead(A6));
+    readings[reading_index++] = get_LSB(analogRead(A6));
+    
+    readings[reading_index++] = get_MSB(analogRead(A7));  
+    readings[reading_index++] = get_LSB(analogRead(A7));
+    
     if(reading_index >= DATA_SIZE)
     {
       reading_index = 0;
@@ -41,8 +53,12 @@ void loop() {
   }
 }
 
-byte scale_analog_value(int value)
+byte get_MSB(int value)
 {
-  //floor(1023 / 4) = 255 or 1023 >> 2 = 255
-  return value >> 2;
+  return (value >> 8) & 255;
+}
+
+byte get_LSB(int value)
+{
+  return value & 255;
 }

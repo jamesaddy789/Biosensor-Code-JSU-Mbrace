@@ -7,10 +7,10 @@
 
 #include <Wire.h>
 
-#define SENSOR_NUMBER 6
+#define DATA_SIZE 12
 #define I2C_ID 1
 
-byte readings[SENSOR_NUMBER];
+byte readings[DATA_SIZE];
 
 void setup() {
   Wire.begin(I2C_ID);
@@ -24,17 +24,33 @@ void loop() {
 }
 
 void read_and_send_on_request() {
-  readings[0] = scale_analog_value(analogRead(A0));
-  readings[1] = scale_analog_value(analogRead(A1));
-  readings[2] = scale_analog_value(analogRead(A2));
-  readings[3] = scale_analog_value(analogRead(A3));
-  readings[4] = scale_analog_value(analogRead(A6));
-  readings[5] = scale_analog_value(analogRead(A7));
-  Wire.write(readings, SENSOR_NUMBER); 
+  readings[0] = get_MSB(analogRead(A0));
+  readings[1] = get_LSB(analogRead(A0));
+  
+  readings[2] = get_MSB(analogRead(A1));
+  readings[3] = get_LSB(analogRead(A1));
+  
+  readings[4] = get_MSB(analogRead(A2));
+  readings[5] = get_LSB(analogRead(A2));
+  
+  readings[6] = get_MSB(analogRead(A3));
+  readings[7] = get_LSB(analogRead(A3));
+  
+  readings[8] = get_MSB(analogRead(A6));
+  readings[9] = get_LSB(analogRead(A6));
+  
+  readings[10] = get_MSB(analogRead(A7));
+  readings[11] = get_LSB(analogRead(A7));
+  
+  Wire.write(readings, DATA_SIZE); 
 }
 
-byte scale_analog_value(int value)
+byte get_MSB(int value)
 {
-  //1023 >> 2 = 255
-  return value >> 2;
+  return (value >> 8) & 255;
+}
+
+byte get_LSB(int value)
+{
+  return value & 255;
 }

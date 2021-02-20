@@ -7,7 +7,7 @@
 
 #include <Wire.h>
 
-#define DATA_SIZE 30 //Wire buffer size is only 32
+#define DATA_SIZE 24 //Wire buffer size is only 32
 #define SAMPLE_INTERVAL 100
 #define I2C_ID 0
 

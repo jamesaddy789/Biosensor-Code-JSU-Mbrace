@@ -22,9 +22,10 @@ const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 const char* ssid = "jsumobilenet";//network name 
 const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
 const char* wifi_password =  ""; //password
-const char* experiment_start_date = "2020-11-30"; //This date will be used for the SD file name
-const char* server_directory = "GCRL_1130"; 
-const char* sd_folder_name = "/GCRL_1130"; //Must start with "/" 
+const char* experiment_start_date = "2020-12-20"; //This date will be used for the SD file name
+const char* server_directory = "/Testing"; 
+const char* sd_folder_name = "/Testing"; //Must start with "/" 
+String server_subdirectory = "ESP32";
 ///////////////////////
 
 WiFiClient client;
@@ -46,6 +47,9 @@ unsigned long get_readings_time = 0;
 
 uint8_t reconnect_count = 0;
 
+unsigned int post_request_content_length;
+int encoded_length;
+
 void setup()
 {
   Serial.begin(9600);
@@ -56,8 +60,7 @@ void setup()
   {
     delay(5000);
   }
-  
-  establish_server_connection();
+ 
   data_array[0] = '{';
   data_array[1] = '{';
   data_array[6] = '}';
@@ -70,6 +73,17 @@ void setup()
   while (!SD.begin(5)) {}
   Serial.println(F("SD Card Mount Succeeded"));
   initialize_sd_file();
+
+  encoded_length = base64_encoded_length(DATA_SIZE);
+  
+  //JSON structure:
+  //{"f":"FOLDER", "n":"NAME", "d":"DATA"}
+  int field_count = 3;
+  post_request_content_length = (field_count * 7) + //based on the JSON structure above
+                       field_count + //for f,n,d
+                       server_subdirectory.length() +
+                       file_name.length() +
+                       encoded_length;
 }
 
 void loop()
@@ -197,22 +211,19 @@ bool valid_send(size_t size_from_send)
 }
 
 bool publish_post(char* encoded_data, int encoded_length)
-{
-  //JSON structure:
-  //{"n":"NAME", "d":"DATA"}
-  // [(4 quotations/parameter + 1 colon/parameter) x #parameters] + 2 brackets + [(#parameters - 1) x ( 1 comma + 1 space)] = (5x2) + 2 + 2 = 14 characters
-  // 14 characters + 2 for 'n' and 'd' = 16 total characters
-  int content_length = 16 + file_name.length() + encoded_length;
+{  
   bool good_publish = valid_send(client.print(F("POST /"))) &&
                       valid_send(client.print(server_directory)) &&
-                      valid_send(client.println(F("/index.php HTTP/1.1"))) &&
+                      valid_send(client.println(F("/create_data_files.php HTTP/1.1"))) &&
                       valid_send(client.println(F("HOST: mbrace.xyz"))) &&
                       valid_send(client.println(F("Content-Type: application/json"))) &&
                       valid_send(client.println(F("Connection: keep-alive"))) &&
                       valid_send(client.print(F("Content-Length: "))) &&
-                      valid_send(client.println(content_length)) &&
+                      valid_send(client.println(post_request_content_length)) &&
                       valid_send(client.println()) &&
-                      valid_send(client.print(F("{\"n\":\""))) &&
+                       valid_send(client.print(F("{\"f\":\""))) &&
+                      valid_send(client.print(server_subdirectory)) &&                   
+                      valid_send(client.print(F("\", \"n\":\""))) &&
                       valid_send(client.print(file_name)) &&
                       valid_send(client.print(F("\", \"d\":\""))) &&
                       valid_send(client.print(encoded_data)) &&

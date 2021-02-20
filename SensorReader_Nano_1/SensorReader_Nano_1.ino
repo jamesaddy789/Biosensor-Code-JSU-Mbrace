@@ -15,9 +15,6 @@ byte readings[DATA_SIZE];
 void setup() {
   Wire.begin(I2C_ID);
   Wire.onRequest(read_and_send_on_request);
-  DDRD = DDRD | 0xFC;    //Declare D2 to D7 as OUTPUTS
-  PORTD = PORTD | 0xFC;  //Set D2 to D7 HIGH
-  pinMode(10, OUTPUT);
 }
 
 void loop() {  

@@ -1,45 +1,44 @@
 /* Written by James Curtis Addy
  * 
- * This code makes an Esp32 act as an i2c master that will
+ * This code makes an Esp8266 act as an i2c master that will
  * request readings 10 times per second from the slave device. The 
  * readings will be saved to an SD card and sent over the internet 
- * using WiFi when the data buffer is full. WPA2 Enterprise connection
- * is supported.
+ * using WiFi when the data buffer is full.
  */
 
 #include <Wire.h>
-#include "esp_wpa2.h" //wpa2 library for connections to Enterprise networks
-#include <WiFi.h>
+#include <ESP8266WiFi.h>
 #include "Base64Encode.h"
-#include "SD.h"
+#include <SD.h>
 
 #define DATA_SIZE 128 //120 bytes for readings and 8 for timestamp {{TTTT}}
 const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
 #define I2C_ID 1
 #define NUMBER_OF_SENSORS 6
+const unsigned int BYTES_TO_REQUEST = NUMBER_OF_SENSORS * 2; //2 bytes per reading for 10-bit resolution 
 
 //Change this stuff////
-const char* ssid = "jsumobilenet";//network name 
-const char* wifi_username = "";//For WPA2-Enterprise connections only. Leave as empty string if not WPA2
+const char* ssid = "";//network name 
 const char* wifi_password =  ""; //password
-const char* experiment_start_date = "2020-12-20"; //This date will be used for the SD file name
-const char* server_directory = "/Testing"; 
-const char* sd_folder_name = "/Testing"; //Must start with "/" 
-String server_subdirectory = "ESP32";
+const char* experiment_start_date = "2021-02-13"; //This date will be used for the SD file name
+const char* server_directory = "/GCRL_Exp2"; 
 ///////////////////////
 
 WiFiClient client;
-volatile byte data_array[DATA_SIZE];
-volatile size_t data_index = 8; //Start after the timestamp
-char server[] = "mbrace.xyz";
-String file_name; //This will be the mac address acquired from WiFi.macAddress()
+byte data_array[DATA_SIZE];
+size_t data_index = 8; //Start after the timestamp
+const char server[] = "mbrace.xyz";
+char file_name[20] = ""; //This will be the mac address acquired from WiFi.macAddress()
+char sd_folder_name[64] = ""; 
+char server_subdirectory[64] = "";
 
 int port = 80;
 
 //SD
 unsigned int sd_file_counter = 0;
-String sd_file_path_string;
-String sd_file_suffix;
+char sd_file_path_string[128] = "";
+char sd_file_suffix[64] = "";
+
 File sd_file;
 unsigned long bytes_written = 0;
 
@@ -54,23 +53,41 @@ void setup()
 {
   Serial.begin(9600);
   Wire.begin();
+  Wire.setClockStretchLimit(1500);  // In µs for Wemos D1 and Nano
+  delay(100);  // Short delay, wait for the Mate to send back CMD
+  //client.setTimeout(1);
 
-  client.setTimeout(1);
   while (!check_connection())
   {
     delay(5000);
   }
- 
+
+  
   data_array[0] = '{';
   data_array[1] = '{';
   data_array[6] = '}';
   data_array[7] = '}';
 
-  file_name = String(WiFi.macAddress());
-  file_name.replace(":", "_");
-  
+  Serial.println("Setting file and folder names");
+  strcpy(file_name, WiFi.macAddress().c_str());
+  replace_char(file_name, ':', '_');
+  Serial.print("File name:");
+  Serial.println(file_name);
+  strcpy(server_subdirectory, "Esp8266_");
+  strcat(server_subdirectory, file_name);
+  Serial.print("Server subdirectory: ");
+  Serial.println(server_subdirectory);
+  strcpy(sd_folder_name, "/");
+  strcat(sd_folder_name, server_subdirectory);
+  Serial.print("SD folder name:");
+  Serial.println(sd_folder_name);
   //Begin SD object (mount to SD card)
-  while (!SD.begin(5)) {}
+  Serial.println("Mounting SD Card");
+  while (!SD.begin(D8)) 
+  {
+    Serial.println(F("SD mount failed"));
+    delay(2000);
+  }
   Serial.println(F("SD Card Mount Succeeded"));
   initialize_sd_file();
 
@@ -81,8 +98,8 @@ void setup()
   int field_count = 3;
   post_request_content_length = (field_count * 7) + //based on the JSON structure above
                        field_count + //for f,n,d
-                       server_subdirectory.length() +
-                       file_name.length() +
+                       strlen(server_subdirectory) +
+                       strlen(file_name) +
                        encoded_length;
 }
 
@@ -90,9 +107,10 @@ void loop()
 {
   if (data_index >= DATA_SIZE)
   {
+    Serial.println(F("Data ready"));
     add_timestamp();
     update_sd_file();
-    int encoded_length = base64_encoded_length(DATA_SIZE);
+    Serial.println(F("SD file updated"));
     char encoded_data[encoded_length];
     base64_encode(encoded_data, (char*)data_array, DATA_SIZE);
     data_index = 8; //Once the data is encoded the original data buffer is free to use.
@@ -100,7 +118,8 @@ void loop()
     {
       if (check_connection())
       {
-        publish_post(encoded_data, encoded_length);
+        publish_post(encoded_data);
+        Serial.println(F("Published data to server"));
       }
       else
       {
@@ -120,33 +139,54 @@ void loop()
   }
 }
 
-bool request_readings()
+void replace_char(char* string, char to_replace, char replace_with)
+{
+  Serial.println("Replace characters");
+  int index = 0;
+  while(string[index] != '\0')
+  {
+    if(string[index] == to_replace)
+    {
+      string[index] = replace_with;    
+    }
+    index++;
+  }
+}
+
+void request_readings()
 {   
-    if(data_index >= DATA_SIZE) return false; //Don't read if the buffer is full
-    Wire.requestFrom(I2C_ID, NUMBER_OF_SENSORS);  
-   
+    if(data_index >= DATA_SIZE) return; //Don't read if the buffer is full
+    Wire.requestFrom(I2C_ID, 12);  
+    size_t index_before_request = data_index;
     while (Wire.available())
     { 
-      for (int i = 0; i < NUMBER_OF_SENSORS; i++)
+      for (int i = 0; i < 12; i++)
       {
         data_array[data_index] = Wire.read();
         data_index++;
       }
     }  
+    if(data_index == index_before_request)
+    {
+      Serial.println(F("I2C failed"));
+    }
 }
 
 bool check_connection()
 {
   if (WiFi.status() != WL_CONNECTED)
   {
-    establish_wifi_connection();
+    Serial.print(F("Connecting to network: "));
+    Serial.println(ssid);
+    WiFi.begin(ssid, wifi_password);
   }
   if (WiFi.status() == WL_CONNECTED)
   {
+    Serial.println(F("WiFi is connected"));
     if (establish_server_connection())
     {      
       return true;
-    }
+    }  
   }     
   return false;
 }
@@ -158,25 +198,6 @@ void add_timestamp()
   data_array[3] = (current_millis >> 16) & 255;
   data_array[4] = (current_millis >> 8) & 255;
   data_array[5] = current_millis & 255;
-}
-
-void establish_wifi_connection()
-{
-  Serial.print(F("Connecting to network: "));
-  Serial.println(ssid);
-  
-  if (String(wifi_username) != "")
-  {
-    Serial.println("Enterprise connection");
-    //Enterprise setup
-    WiFi.mode(WIFI_STA); //init wifi mode
-    esp_wifi_sta_wpa2_ent_set_identity((uint8_t *)wifi_username, strlen(wifi_username)); //provide identity
-    esp_wifi_sta_wpa2_ent_set_username((uint8_t *)wifi_username, strlen(wifi_username)); //provide username --> identity and username is same
-    esp_wifi_sta_wpa2_ent_set_password((uint8_t *)wifi_password, strlen(wifi_password)); //provide password
-    esp_wpa2_config_t config = WPA2_CONFIG_INIT_DEFAULT(); //set config settings to default
-    esp_wifi_sta_wpa2_ent_enable(&config); //set config settings to enable function
-  }
-  WiFi.begin(ssid, wifi_password);
 }
 
 bool establish_server_connection()
@@ -192,8 +213,10 @@ bool establish_server_connection()
   
   if (!client.connected())
   {
+    Serial.println(F("Connecting to server"));
     if (client.connect(server, port))
     {
+      Serial.println(F("Connected to server"));
       return true;
     }
     else
@@ -210,7 +233,7 @@ bool valid_send(size_t size_from_send)
   return size_from_send > 0;
 }
 
-bool publish_post(char* encoded_data, int encoded_length)
+bool publish_post(char* encoded_data)
 {  
   bool good_publish = valid_send(client.print(F("POST /"))) &&
                       valid_send(client.print(server_directory)) &&
@@ -221,7 +244,7 @@ bool publish_post(char* encoded_data, int encoded_length)
                       valid_send(client.print(F("Content-Length: "))) &&
                       valid_send(client.println(post_request_content_length)) &&
                       valid_send(client.println()) &&
-                       valid_send(client.print(F("{\"f\":\""))) &&
+                      valid_send(client.print(F("{\"f\":\""))) &&
                       valid_send(client.print(server_subdirectory)) &&                   
                       valid_send(client.print(F("\", \"n\":\""))) &&
                       valid_send(client.print(file_name)) &&
@@ -264,13 +287,6 @@ unsigned int get_file_count(const char* folder_path)
 
 void update_sd_file()
 {
-  if (!sd_file)
-  {
-    //Initialize file
-    update_sd_file_path_string();
-    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
-  }
-
   sd_file.write((uint8_t*)data_array, DATA_SIZE);
   sd_file.flush();
   bytes_written += DATA_SIZE;
@@ -281,10 +297,19 @@ void update_sd_file()
     bytes_written = 0;
     sd_file_counter += 1;
     sd_file.close();
-    sd_file_suffix = String(sd_file_counter);
+    set_sd_suffix_to_counter();
     update_sd_file_path_string();
-    sd_file = SD.open(sd_file_path_string.c_str(), FILE_APPEND);
+    sd_file = SD.open(sd_file_path_string, FILE_WRITE);
   }
+}
+
+void set_sd_suffix_to_counter()
+{
+  char counter_string[20] = "";
+  sprintf(counter_string, "%d", sd_file_counter); 
+  Serial.print("SD counter: ");
+  Serial.println(counter_string);
+  strcpy(sd_file_suffix, counter_string);
 }
 
 void initialize_sd_file()
@@ -296,21 +321,30 @@ void initialize_sd_file()
   }
   //Set counter to the most recent file in the folder.
   sd_file_counter = get_file_count(sd_folder_name) + 1;
+  
+  set_sd_suffix_to_counter();
+  
   if (sd_file_counter != 1)
   {
     //If there are already files in the folder, this must be a reset.
-    sd_file_suffix = String(String(sd_file_counter) + "_Reset");
+    strcat(sd_file_suffix, "_Reset");
   }
-  else
-  {
-    //Otherwise, start the count at 1.
-    sd_file_suffix = String(sd_file_counter);
-  }
-  bytes_written = 0;
+
+  //Initialize file
+  update_sd_file_path_string();
+  sd_file = SD.open(sd_file_path_string, FILE_WRITE);
 }
 
 void update_sd_file_path_string()
 {
   //The mac address is already acquired in the server file name.
-  sd_file_path_string = String(String(sd_folder_name) + "/" + file_name + "__" + String(experiment_start_date) + "_"  + sd_file_suffix + ".bin");
+  strcpy(sd_file_path_string, sd_folder_name);
+  strcat(sd_file_path_string, "/");
+  strcat(sd_file_path_string, file_name);
+  strcat(sd_file_path_string, "__");
+  strcat(sd_file_path_string, experiment_start_date);
+  strcat(sd_file_path_string, "__");
+  strcat(sd_file_path_string, sd_file_suffix);
+  strcat(sd_file_path_string, ".bin");
+  //(sd_folder_name)/(file_name)__(experiment_start_date)__(sd_file_suffix).bin
 }

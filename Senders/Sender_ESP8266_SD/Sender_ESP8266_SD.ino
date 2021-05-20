@@ -53,7 +53,7 @@ void setup()
 {
   Serial.begin(9600);
   Wire.begin();
-  Wire.setClockStretchLimit(1500);  // In µs for Wemos D1 and Nano
+  Wire.setClockStretchLimit(3000);  // In µs for Wemos D1 and Nano
   delay(100);  // Short delay, wait for the Mate to send back CMD
   //client.setTimeout(1);
 

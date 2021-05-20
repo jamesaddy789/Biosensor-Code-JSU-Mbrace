@@ -8,7 +8,7 @@ volatile short sensor_value[sensor_number];
 volatile byte sensor[byte_number];
 
 void setup() {
-  Serial.begin(9600);
+  //Serial.begin(9600);
   Wire.begin(1);                // join i2c bus with address 1
   Wire.onRequest(requestEvent);
 }

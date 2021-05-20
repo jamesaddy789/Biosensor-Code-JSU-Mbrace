@@ -18,11 +18,17 @@ void loop() {
 }
 
 void requestEvent() {
+  analogRead(0);
   sensor_value[0] = analogRead(0);
+  analogRead(1);
   sensor_value[1] = analogRead(1);
+  analogRead(2);
   sensor_value[2] = analogRead(2);
+  analogRead(3);
   sensor_value[3] = analogRead(3);
+  analogRead(6);
   sensor_value[4] = analogRead(6);
+  analogRead(7);
   sensor_value[5] = analogRead(7);
 
   int i = 0;

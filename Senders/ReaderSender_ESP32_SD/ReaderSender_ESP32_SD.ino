@@ -1,12 +1,9 @@
 /* Written by James Curtis Addy
 
-   This code makes an Esp32 act as an i2c master that will
-   request readings 10 times per second from the slave device. The
-   readings will be saved to an SD card and sent over the internet
-   using WiFi when the data buffer is full.
+  This code reads the analog pins of an ESP32 and 
+  sends the data to a server when the buffer is full.
 */
 
-#include <Wire.h>
 #include "esp_wpa2.h" //wpa2 library for connections to Enterprise networks
 #include <WiFi.h>
 #include "Base64Encode.h"
@@ -14,9 +11,6 @@
 
 #define DATA_SIZE 128 //120 bytes for readings and 8 for timestamp {{TTTT}}
 const unsigned int BYTES_PER_DAY = DATA_SIZE * 3600 * 24; //Day's worth of bytes
-#define I2C_ID 1
-#define NUMBER_OF_SENSORS 6
-const unsigned int BYTES_TO_REQUEST = NUMBER_OF_SENSORS * 2; //2 bytes per reading for 10-bit resolution
 
 //Change this stuff////
 const char* ssid = "";//network name
@@ -54,7 +48,6 @@ int encoded_length;
 void setup()
 {
   Serial.begin(9600);
-  Wire.begin();
   delay(100);  // Short delay, wait for the Mate to send back CMD
   client.setTimeout(1);
 
@@ -74,7 +67,7 @@ void setup()
   replace_char(file_name, ':', '_');
   Serial.print("File name:");
   Serial.println(file_name);
-  strcpy(server_subdirectory, "Esp32_");
+  strcpy(server_subdirectory, "Esp32ReaderTest_");
   strcat(server_subdirectory, file_name);
   Serial.print("Server subdirectory: ");
   Serial.println(server_subdirectory);
@@ -136,7 +129,7 @@ void loop()
   if ((millis() - get_readings_time) >= 100)
   {
     get_readings_time = millis();
-    request_readings();
+    collect_readings();
   }
 }
 
@@ -154,22 +147,29 @@ void replace_char(char* string, char to_replace, char replace_with)
   }
 }
 
-void request_readings()
+void collect_readings()
 {
   if (data_index >= DATA_SIZE) return; //Don't read if the buffer is full
-  Wire.requestFrom(I2C_ID, 12);
-  size_t index_before_request = data_index;
-  while (Wire.available())
+  short readings[6];
+  analogRead(32);
+  readings[0] = analogRead(32);
+  analogRead(33);
+  readings[1] = analogRead(33);
+  analogRead(34);
+  readings[2] = analogRead(34);
+  analogRead(35);
+  readings[3] = analogRead(35);
+  analogRead(36);
+  readings[4] = analogRead(36);
+  analogRead(39);
+  readings[5] = analogRead(39);
+
+  for(int i = 0; i < 6; i++)
   {
-    for (int i = 0; i < 12; i++)
-    {
-      data_array[data_index] = Wire.read();
-      data_index++;
-    }
-  }
-  if (data_index == index_before_request)
-  {
-    Serial.println(F("I2C failed"));
+    data_array[data_index] = highByte(readings[i]);
+    data_index++;
+    data_array[data_index] = lowByte(readings[i]);
+    data_index++;
   }
 }
 
